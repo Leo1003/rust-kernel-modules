@@ -1,0 +1,34 @@
+# Object files
+*.o
+*.o.*
+*.ko
+*.elf
+
+# Libraries
+*.lib
+*.a
+
+# Shared objects
+*.so
+*.so.*
+
+# Kernel generated files
+*.mod*
+*.cmd
+*.rmeta
+.tmp_versions/
+modules.order
+Module.symvers
+
+# Rustfmt backup files
+**/*.rs.bk
+
+# Compressed files
+*.bz2
+*.gz
+*.lz4
+*.lzma
+*.lzo
+*.tar
+*.xz
+*.zst
