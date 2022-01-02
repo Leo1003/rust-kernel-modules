@@ -10,17 +10,17 @@ use core::cmp::min;
 use core::pin::Pin;
 use kernel::prelude::*;
 use kernel::{
-    chrdev, c_str,
     file::File,
     file_operations::{FileOpener, FileOperations},
     io_buffer::IoBufferWriter,
+    miscdev,
 };
 
 module! {
     type: RustHelloDev,
     name: b"rs_hello",
-    author: b"Leo Chen <leo881003@gmail.com>",
-    description: b"An example helloworld device kernel module written in Rust",
+    author: b"Shao-Fu Chen <shfchen@gmail.com>",
+    description: b"An example helloworld charactor device kernel module written in Rust",
     license: b"GPL v2",
 }
 
@@ -29,7 +29,7 @@ const HELLO_MSG: &[u8] = b"Hello, world\n";
 struct HelloChrdev;
 
 impl FileOpener<()> for HelloChrdev {
-    fn open(_ctx: &()) -> Result<Self::Wrapper> {
+    fn open(_ctx: &(), _file: &File) -> Result<Self::Wrapper> {
         pr_info!("rust device was opened!\n");
         Ok(Box::try_new(Self)?)
     }
@@ -38,10 +38,10 @@ impl FileOpener<()> for HelloChrdev {
 impl FileOperations for HelloChrdev {
     type Wrapper = Box<Self>;
 
-    kernel::declare_file_operations!(read);
+    kernel::declare_file_operations!(read, read_iter);
 
     fn read(_this: &Self, _file: &File, data: &mut impl IoBufferWriter, offset: u64) -> Result<usize> {
-        if offset > HELLO_MSG.len() as u64 {
+        if offset >= HELLO_MSG.len() as u64 {
             Ok(0)
         } else {
             let len = min(data.len(), HELLO_MSG.len());
@@ -52,24 +52,17 @@ impl FileOperations for HelloChrdev {
 }
 
 struct RustHelloDev {
-    _chrdev: Pin<Box<chrdev::Registration<2>>>,
+    _chrdev: Pin<Box<miscdev::Registration>>,
 }
 
 impl KernelModule for RustHelloDev {
-    fn init() -> Result<Self> {
+    fn init(name: &'static CStr, _module: &'static ThisModule) -> Result<Self> {
         pr_info!("Rust Hello Charactor Device (init)\n");
-        pr_info!("Am I built-in? {}\n", !cfg!(MODULE));
 
-        let mut chrdev_reg =
-            chrdev::Registration::new_pinned(c_str!("rust_hello_chrdev"), 0, &THIS_MODULE)?;
-        // Register the same kind of device twice, we're just demonstrating
-        // that you can use multiple minors. There are two minors in this case
-        // because its type is `chrdev::Registration<2>`
-        chrdev_reg.as_mut().register::<HelloChrdev>()?;
-        chrdev_reg.as_mut().register::<HelloChrdev>()?;
+        let dev_reg = miscdev::Registration::new_pinned::<HelloChrdev>(name, None, ())?;
 
         Ok(RustHelloDev {
-            _chrdev: chrdev_reg,
+            _chrdev: dev_reg,
         })
     }
 }
@@ -79,3 +72,4 @@ impl Drop for RustHelloDev {
         pr_info!("Rust Hello Charactor Device (exit)\n");
     }
 }
+
