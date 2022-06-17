@@ -2,16 +2,12 @@
 
 //! Rust /dev/null charactor device
 
-#![no_std]
-#![feature(allocator_api, global_asm)]
-
 use alloc::boxed::Box;
 use core::pin::Pin;
 use kernel::prelude::*;
 use kernel::{
     chrdev, c_str,
-    file::File,
-    file_operations::{FileOpener, FileOperations},
+    file::{File, Operations},
     io_buffer::{IoBufferReader, IoBufferWriter},
 };
 
@@ -25,22 +21,18 @@ module! {
 
 struct Nulldev;
 
-impl FileOpener<()> for Nulldev {
-    fn open(_ctx: &()) -> Result<Self::Wrapper> {
-        Ok(Box::try_new(Self)?)
-    }
-}
-
-impl FileOperations for Nulldev {
-    type Wrapper = Box<Self>;
-
+impl Operations for Nulldev {
     kernel::declare_file_operations!(read, read_iter, write, write_iter);
 
-    fn read(_this: &Self, _file: &File, _data: &mut impl IoBufferWriter, _offset: u64) -> Result<usize> {
+    fn open(_shared: &(), _file: &File) -> Result {
+        Ok(())
+    }
+
+    fn read(_this: (), _file: &File, _data: &mut impl IoBufferWriter, _offset: u64) -> Result<usize> {
         Ok(0)
     }
     
-    fn write(_this: &Self, _file: &File, buf: &mut impl IoBufferReader, _offset: u64) -> Result<usize> {
+    fn write(_this: (), _file: &File, buf: &mut impl IoBufferReader, _offset: u64) -> Result<usize> {
         Ok(buf.len())
     }
 }
@@ -49,12 +41,12 @@ struct RustNullDev {
     _chrdev: Pin<Box<chrdev::Registration<1>>>,
 }
 
-impl KernelModule for RustNullDev {
-    fn init() -> Result<Self> {
+impl kernel::Module for RustNullDev {
+    fn init(name: &'static CStr, module: &'static ThisModule) -> Result<Self> {
         pr_info!("Rust Null Charactor Device (init)\n");
 
         let mut chrdev_reg =
-            chrdev::Registration::new_pinned(c_str!("rust_null_chrdev"), 0, &THIS_MODULE)?;
+            chrdev::Registration::new_pinned(name, 0, module)?;
 
         chrdev_reg.as_mut().register::<Nulldev>()?;
 
